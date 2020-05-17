@@ -2,21 +2,18 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this file,
 // You can obtain one at http://mozilla.org/MPL/2.0/.
 //
-// Copyright (c) 2018, Olof Kraigher olof.kraigher@gmail.com
+// Copyright (c) 2020, Olof Kraigher olof.kraigher@gmail.com
 
 //! Configuration of the design hierarchy and other settings
 
-use toml;
-
-use self::fnv::FnvHashMap;
-use self::toml::Value;
 use crate::data::*;
-use fnv;
+use fnv::FnvHashMap;
 use std::env;
 use std::fs::File;
 use std::io;
 use std::io::prelude::*;
 use std::path::Path;
+use toml::Value;
 
 #[derive(Clone, PartialEq, Default, Debug)]
 pub struct Config {

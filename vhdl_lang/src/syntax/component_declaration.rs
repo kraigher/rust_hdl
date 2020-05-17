@@ -8,13 +8,13 @@ use super::common::error_on_end_identifier_mismatch;
 use super::common::ParseResult;
 use super::interface_declaration::{parse_generic_interface_list, parse_port_interface_list};
 use super::tokens::{Kind::*, TokenStream};
-use crate::ast::{ComponentDeclaration, InterfaceDeclaration};
+use crate::ast::{ComponentDeclaration, InterfaceList};
 use crate::data::{Diagnostic, DiagnosticHandler};
 
 pub fn parse_optional_generic_list(
     stream: &mut TokenStream,
     diagnostics: &mut dyn DiagnosticHandler,
-) -> ParseResult<Option<Vec<InterfaceDeclaration>>> {
+) -> ParseResult<Option<InterfaceList>> {
     let mut list = None;
     loop {
         let token = stream.peek_expect()?;
@@ -22,11 +22,15 @@ pub fn parse_optional_generic_list(
             Generic => {
                 stream.move_after(&token);
                 let new_list = parse_generic_interface_list(stream, diagnostics)?;
-                stream.expect_kind(SemiColon)?;
+                let semi_token = stream.expect_kind(SemiColon)?;
                 if list.is_some() {
                     diagnostics.push(Diagnostic::error(token, "Duplicate generic clause"));
                 } else {
-                    list = Some(new_list);
+                    list = Some(InterfaceList {
+                        items: new_list,
+                        start_token: token.into(),
+                        semi_token: semi_token.into(),
+                    });
                 }
             }
             _ => break,
@@ -39,7 +43,7 @@ pub fn parse_optional_generic_list(
 pub fn parse_optional_port_list(
     stream: &mut TokenStream,
     diagnostics: &mut dyn DiagnosticHandler,
-) -> ParseResult<Option<Vec<InterfaceDeclaration>>> {
+) -> ParseResult<Option<InterfaceList>> {
     let mut list = None;
     loop {
         let token = stream.peek_expect()?;
@@ -47,11 +51,15 @@ pub fn parse_optional_port_list(
             Port => {
                 stream.move_after(&token);
                 let new_list = parse_port_interface_list(stream, diagnostics)?;
-                stream.expect_kind(SemiColon)?;
+                let semi_token = stream.expect_kind(SemiColon)?;
                 if list.is_some() {
                     diagnostics.push(Diagnostic::error(token, "Duplicate port clause"));
                 } else {
-                    list = Some(new_list);
+                    list = Some(InterfaceList {
+                        items: new_list,
+                        start_token: token.into(),
+                        semi_token: semi_token.into(),
+                    });
                 }
             }
             Generic => {
@@ -92,8 +100,8 @@ pub fn parse_component_declaration(
 
     Ok(ComponentDeclaration {
         ident,
-        generic_list: generic_list.unwrap_or_default(),
-        port_list: port_list.unwrap_or_default(),
+        generic_list: generic_list.map_or(Vec::new(), |list| list.items),
+        port_list: port_list.map_or(Vec::new(), |list| list.items),
     })
 }
 
@@ -101,7 +109,7 @@ pub fn parse_component_declaration(
 mod tests {
     use super::*;
 
-    use crate::ast::Ident;
+    use crate::ast::{Ident, InterfaceDeclaration};
     use crate::syntax::test::Code;
 
     fn to_component(
@@ -222,7 +230,14 @@ end
                 "Duplicate generic clause"
             )]
         );
-        assert_eq!(result, Ok(Some(vec![code.s1("foo : natural").generic()])),);
+        assert_eq!(
+            result,
+            Ok(Some(InterfaceList {
+                items: vec![code.s1("foo : natural").generic()],
+                start_token: code.keyword_token(Generic, 1),
+                semi_token: code.keyword_token(SemiColon, 1)
+            })),
+        );
     }
 
     #[test]
@@ -246,7 +261,14 @@ end
                 "Duplicate port clause"
             )]
         );
-        assert_eq!(result, Ok(Some(vec![code.s1("foo : natural").port()])),);
+        assert_eq!(
+            result,
+            Ok(Some(InterfaceList {
+                items: vec![code.s1("foo : natural").port()],
+                start_token: code.keyword_token(Port, 1),
+                semi_token: code.keyword_token(SemiColon, 1)
+            })),
+        );
     }
 
     #[test]
@@ -270,6 +292,13 @@ end
                 "Generic clause must come before port clause"
             )]
         );
-        assert_eq!(result, Ok(Some(vec![code.s1("foo : natural").port()])),);
+        assert_eq!(
+            result,
+            Ok(Some(InterfaceList {
+                items: vec![code.s1("foo : natural").port()],
+                start_token: code.keyword_token(Port, 1),
+                semi_token: code.keyword_token(SemiColon, 1)
+            })),
+        );
     }
 }

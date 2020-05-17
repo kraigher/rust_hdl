@@ -12,6 +12,7 @@ mod message;
 mod source;
 mod symbol_table;
 
+pub use crate::syntax::KeyWordToken;
 pub use contents::*;
 pub use diagnostic::*;
 pub use latin_1::*;

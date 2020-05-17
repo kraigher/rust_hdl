@@ -26,6 +26,7 @@ use crate::data::*;
 
 /// LRM 11.2 Block statement
 pub fn parse_block_statement(
+    block_token: Token,
     stream: &mut TokenStream,
     diagnostics: &mut dyn DiagnosticHandler,
 ) -> ParseResult<BlockStatement> {
@@ -48,12 +49,14 @@ pub fn parse_block_statement(
     stream.expect_kind(Block)?;
     // @TODO check name
     stream.pop_if_kind(Identifier)?;
-    stream.expect_kind(SemiColon)?;
+    let semi_token = stream.expect_kind(SemiColon)?.into();
     Ok(BlockStatement {
         guard_condition,
         header,
         decl,
         statements,
+        block_token: block_token.into(),
+        semi_token,
     })
 }
 
@@ -153,9 +156,10 @@ fn parse_block_header(
 /// LRM 11.3 Process statement
 pub fn parse_process_statement(
     stream: &mut TokenStream,
-    postponed: bool,
+    start_token: Token,
     diagnostics: &mut dyn DiagnosticHandler,
 ) -> ParseResult<ProcessStatement> {
+    let postponed = start_token.kind == Postponed;
     let token = stream.peek_expect()?;
     let sensitivity_list = {
         match token.kind {
@@ -207,12 +211,14 @@ pub fn parse_process_statement(
     stream.expect_kind(Process)?;
     // @TODO check name
     stream.pop_if_kind(Identifier)?;
-    stream.expect_kind(SemiColon)?;
+    let semi_token = stream.expect_kind(SemiColon)?.into();
     Ok(ProcessStatement {
         postponed,
         sensitivity_list,
         decl,
         statements,
+        start_token: start_token.into(),
+        semi_token,
     })
 }
 
@@ -557,10 +563,10 @@ pub fn parse_concurrent_statement(
         try_token_kind!(
             token,
             Block => {
-                ConcurrentStatement::Block(parse_block_statement(stream, diagnostics)?)
+                ConcurrentStatement::Block(parse_block_statement(token, stream, diagnostics)?)
             },
             Process => {
-                ConcurrentStatement::Process(parse_process_statement(stream, false, diagnostics)?)
+                ConcurrentStatement::Process(parse_process_statement(stream, token, diagnostics)?)
             },
             Component => {
                 let unit = InstantiatedUnit::Component(parse_selected_name(stream)?);
@@ -589,13 +595,13 @@ pub fn parse_concurrent_statement(
             Case => ConcurrentStatement::CaseGenerate(parse_case_generate_statement(stream, diagnostics)?),
             Assert => ConcurrentStatement::Assert(parse_concurrent_assert_statement(stream, false)?),
             Postponed => {
-                let token = stream.expect()?;
-                match token.kind {
-                    Process => ConcurrentStatement::Process(parse_process_statement(stream, true, diagnostics)?),
+                let next_token = stream.expect()?;
+                match next_token.kind {
+                    Process => ConcurrentStatement::Process(parse_process_statement(stream, token, diagnostics)?),
                     Assert => ConcurrentStatement::Assert(parse_concurrent_assert_statement(stream, true)?),
                     With => ConcurrentStatement::Assignment(parse_selected_signal_assignment(stream, true)?),
                     _ => {
-                        let target = parse_name_initial_token(stream, token)?.map_into(Target::Name);
+                        let target = parse_name_initial_token(stream, next_token)?.map_into(Target::Name);
                         stream.expect_kind(SemiColon)?;
                         ConcurrentStatement::ProcedureCall(to_procedure_call(target, true)?)
                     }
@@ -799,6 +805,8 @@ end block;
                 label: Some(code.s1("name2").ident()),
                 statement: ConcurrentStatement::ProcedureCall(call),
             }],
+            block_token: code.keyword_token(Block, 1),
+            semi_token: code.keyword_token(SemiColon, -1),
         };
         let stmt = code.with_stream_no_diagnostics(parse_labeled_concurrent_statement);
         assert_eq!(stmt.label, Some(code.s1("name").ident()));
@@ -824,6 +832,8 @@ end block name;
             },
             decl: vec![],
             statements: vec![],
+            block_token: code.keyword_token(Block, 1),
+            semi_token: code.keyword_token(SemiColon, -1),
         };
         let stmt = code.with_stream_no_diagnostics(parse_labeled_concurrent_statement);
         assert_eq!(stmt.label, Some(code.s1("name").ident()));
@@ -849,6 +859,8 @@ end block;
             },
             decl: vec![],
             statements: vec![],
+            block_token: code.keyword_token(Block, 1),
+            semi_token: code.keyword_token(SemiColon, -1),
         };
         let stmt = code.with_stream_no_diagnostics(parse_labeled_concurrent_statement);
         assert_eq!(stmt.label, Some(code.s1("name").ident()));
@@ -874,6 +886,8 @@ end block;
             },
             decl: vec![],
             statements: vec![],
+            block_token: code.keyword_token(Block, 1),
+            semi_token: code.keyword_token(SemiColon, -1),
         };
         let stmt = code.with_stream_no_diagnostics(parse_labeled_concurrent_statement);
         assert_eq!(stmt.label, Some(code.s1("name").ident()));
@@ -903,6 +917,8 @@ end block;
             },
             decl: vec![],
             statements: vec![],
+            block_token: code.keyword_token(Block, 1),
+            semi_token: code.keyword_token(SemiColon, -1),
         };
         let stmt = code.with_stream_no_diagnostics(parse_labeled_concurrent_statement);
         assert_eq!(stmt.label, Some(code.s1("name").ident()));
@@ -923,6 +939,8 @@ end process;
             sensitivity_list: None,
             decl: vec![],
             statements: vec![],
+            start_token: code.keyword_token(Process, 1),
+            semi_token: code.keyword_token(SemiColon, -1),
         };
         let stmt = code.with_stream_no_diagnostics(parse_labeled_concurrent_statement);
         assert_eq!(stmt.label, None);
@@ -943,6 +961,8 @@ end process name;
             sensitivity_list: None,
             decl: vec![],
             statements: vec![],
+            start_token: code.keyword_token(Process, 1),
+            semi_token: code.keyword_token(SemiColon, -1),
         };
         let stmt = code.with_stream_no_diagnostics(parse_labeled_concurrent_statement);
         assert_eq!(stmt.label, Some(code.s1("name").ident()));
@@ -963,6 +983,8 @@ end process;
             sensitivity_list: None,
             decl: vec![],
             statements: vec![],
+            start_token: code.keyword_token(Postponed, 1),
+            semi_token: code.keyword_token(SemiColon, -1),
         };
         let stmt = code.with_stream_no_diagnostics(parse_labeled_concurrent_statement);
         assert_eq!(stmt.label, None);
@@ -983,6 +1005,8 @@ end postponed process;
             sensitivity_list: None,
             decl: vec![],
             statements: vec![],
+            start_token: code.keyword_token(Postponed, 1),
+            semi_token: code.keyword_token(SemiColon, -1),
         };
         let stmt = code.with_stream_no_diagnostics(parse_labeled_concurrent_statement);
         assert_eq!(stmt.label, None);
@@ -1004,6 +1028,8 @@ end postponed process;
             sensitivity_list: None,
             decl: Vec::new(),
             statements: Vec::new(),
+            start_token: code.keyword_token(Process, 1),
+            semi_token: code.keyword_token(SemiColon, -1),
         };
         assert_eq!(
             diagnostics,
@@ -1032,6 +1058,8 @@ end process;
             ])),
             decl: vec![],
             statements: vec![],
+            start_token: code.keyword_token(Process, 1),
+            semi_token: code.keyword_token(SemiColon, -1),
         };
         let stmt = code.with_stream_no_diagnostics(parse_labeled_concurrent_statement);
         assert_eq!(stmt.label, None);
@@ -1053,6 +1081,8 @@ end process;
             sensitivity_list: Some(SensitivityList::Names(Vec::new())),
             decl: Vec::new(),
             statements: Vec::new(),
+            start_token: code.keyword_token(Process, 1),
+            semi_token: code.keyword_token(SemiColon, -1),
         };
         assert_eq!(
             diagnostics,
@@ -1084,6 +1114,8 @@ end process;
                 code.s1("foo <= true;").sequential_statement(),
                 code.s1("wait;").sequential_statement(),
             ],
+            start_token: code.keyword_token(Process, 1),
+            semi_token: code.keyword_token(SemiColon, -1),
         };
         let stmt = code.with_stream_no_diagnostics(parse_labeled_concurrent_statement);
         assert_eq!(stmt.label, None);

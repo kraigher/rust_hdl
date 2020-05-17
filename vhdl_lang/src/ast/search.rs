@@ -389,6 +389,8 @@ impl Search for LabeledConcurrentStatement {
                     sensitivity_list,
                     decl,
                     statements,
+                    start_token: _,
+                    semi_token: _,
                 } = process;
                 return_if_found!(sensitivity_list.search(searcher));
                 return_if_found!(decl.search(searcher));
@@ -879,6 +881,13 @@ impl Search for InterfaceDeclaration {
             }
             _ => {}
         };
+        NotFound
+    }
+}
+
+impl Search for InterfaceList {
+    fn search(&self, searcher: &mut impl Searcher) -> SearchResult {
+        return_if_found!(self.items.search(searcher));
         NotFound
     }
 }

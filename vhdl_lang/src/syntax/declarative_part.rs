@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this file,
 // You can obtain one at http://mozilla.org/MPL/2.0/.
 //
-// Copyright (c) 2018, Olof Kraigher olof.kraigher@gmail.com
+// Copyright (c) 2020, Olof Kraigher olof.kraigher@gmail.com
 
 use super::alias_declaration::parse_alias_declaration;
 use super::attributes::parse_attribute;
@@ -19,27 +19,32 @@ use crate::ast::{ContextClause, Declaration, PackageInstantiation};
 use crate::data::DiagnosticHandler;
 
 pub fn parse_package_instantiation(stream: &mut TokenStream) -> ParseResult<PackageInstantiation> {
-    stream.expect_kind(Package)?;
+    let package_token = stream.expect_kind(Package)?.into();
     let ident = stream.expect_ident()?;
     stream.expect_kind(Is)?;
     stream.expect_kind(New)?;
     let package_name = parse_selected_name(stream)?;
 
     let token = stream.expect()?;
-    let generic_map = try_token_kind!(
+    let (generic_map, semi_token) = try_token_kind!(
         token,
         Generic => {
             stream.expect_kind(Map)?;
             let association_list = parse_association_list(stream)?;
-            stream.expect_kind(SemiColon)?;
-            Some(association_list)
+            let semi_token = stream.expect_kind(SemiColon)?;
+            (Some(association_list), semi_token.into())
         },
-        SemiColon => None);
+        SemiColon => {
+            (None, token.into())
+        }
+    );
     Ok(PackageInstantiation {
         context_clause: ContextClause::default(),
         ident,
         package_name,
         generic_map,
+        package_token,
+        semi_token,
     })
 }
 
@@ -63,6 +68,7 @@ fn check_declarative_part(token: &Token, may_end: bool, may_begin: bool) -> Pars
         }
     }
 }
+
 pub fn parse_declarative_part(
     stream: &mut TokenStream,
     diagnostics: &mut dyn DiagnosticHandler,
@@ -73,6 +79,18 @@ pub fn parse_declarative_part(
 
     stream.expect_kind(end_token).log(diagnostics);
     Ok(decl)
+}
+
+pub fn parse_declarative_part_end_token(
+    stream: &mut TokenStream,
+    diagnostics: &mut dyn DiagnosticHandler,
+    begin_is_end: bool,
+) -> ParseResult<(Vec<Declaration>, Token)> {
+    let expected_end_token = if begin_is_end { Begin } else { End };
+    let decl = parse_declarative_part_leave_end_token(stream, diagnostics)?;
+    let end_token = stream.peek_expect()?;
+    stream.expect_kind(expected_end_token).log(diagnostics);
+    Ok((decl, end_token))
 }
 
 pub fn parse_declarative_part_leave_end_token(
@@ -177,7 +195,9 @@ package ident is new lib.foo.bar;
                 context_clause: ContextClause::default(),
                 ident: code.s1("ident").ident(),
                 package_name: code.s1("lib.foo.bar").selected_name(),
-                generic_map: None
+                generic_map: None,
+                package_token: code.keyword_token(Package, 1),
+                semi_token: code.keyword_token(SemiColon, -1),
             }
         );
     }
@@ -203,7 +223,9 @@ package ident is new lib.foo.bar
     foo => bar
   )")
                         .association_list()
-                )
+                ),
+                package_token: code.keyword_token(Package, 1),
+                semi_token: code.keyword_token(SemiColon, -1),
             }
         );
     }

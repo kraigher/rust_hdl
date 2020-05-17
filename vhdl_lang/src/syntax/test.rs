@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this file,
 // You can obtain one at http://mozilla.org/MPL/2.0/.
 //
-// Copyright (c) 2018, Olof Kraigher olof.kraigher@gmail.com
+// Copyright (c) 2020, Olof Kraigher olof.kraigher@gmail.com
 
 use super::common::ParseResult;
 use super::concurrent_statement::parse_labeled_concurrent_statement;
@@ -16,7 +16,7 @@ use super::range::{parse_discrete_range, parse_range};
 use super::sequential_statement::parse_sequential_statement;
 use super::subprogram::{parse_signature, parse_subprogram_declaration_no_semi};
 use super::subtype_indication::parse_subtype_indication;
-use super::tokens::{Comment, Symbols, Token, TokenStream, Tokenizer};
+use super::tokens::{Comment, KeyWordToken, Kind, Symbols, Token, TokenStream, Tokenizer};
 use super::waveform::parse_waveform;
 use crate::ast;
 use crate::ast::*;
@@ -425,6 +425,29 @@ impl Code {
             name => panic!("Expected attribute got {:?}", name),
         }
     }
+
+    /// Get a keyword token from the n:th occurance of kind or last occurance if
+    /// occurance = -1
+    pub fn keyword_token(&self, kind: Kind, occurance: isize) -> KeyWordToken {
+        let mut count = 0;
+        let mut keyword_token = None;
+        for token in self.tokenize().iter() {
+            if token.kind == kind {
+                count += 1;
+                if occurance == -1 || count == occurance {
+                    keyword_token = Some(KeyWordToken {
+                        kind: token.kind,
+                        pos: token.pos.clone(),
+                        comments: token.comments.clone(),
+                    });
+                    if count == occurance {
+                        break;
+                    }
+                }
+            }
+        }
+        keyword_token.unwrap()
+    }
 }
 
 fn substr_range(source: &Source, range: Range, substr: &str, occurence: usize) -> Range {
@@ -568,6 +591,48 @@ impl AsRef<SrcPos> for Code {
         &self.pos
     }
 }
+
+// // Create a Range spanning from the first substring occurance of start to
+// // to the first occurance of end after start (may overlap)
+// pub fn source_range(code: &Code, start: &str, end: &str) -> SrcPos {
+//     let start = code.s1(start).pos;
+//     let mut end_occurance = 1;
+//     loop {
+//         let end = code.s(end, end_occurance).pos;
+//         if end.range().start.line >= start.range().start.line
+//             && end.range().end.line >= start.range().end.line
+//         {
+//             break start.combine_into(&end);
+//         }
+//         end_occurance += 1;
+//         if end_occurance > 1000 {
+//             panic!("Unable to find range");
+//         }
+//     }
+// }
+
+// pub fn source_range_between(code: &Code, start: &str, end: &str) -> SrcPos {
+//     let start = code.s1(start).pos;
+//     let mut end_occurance = 1;
+//     loop {
+//         let end = code.s(end, end_occurance).pos;
+//         if end.range().start.line >= start.range().start.line
+//             && end.range().end.line >= start.range().end.line
+//         {
+//             break SrcPos::new(
+//                 code.source().clone(),
+//                 Range {
+//                     start: start.pos().end(),
+//                     end: end.pos().start(),
+//                 },
+//             );
+//         }
+//         end_occurance += 1;
+//         if end_occurance > 1000 {
+//             panic!("Unable to find range");
+//         }
+//     }
+// }
 
 mod tests {
     use super::*;

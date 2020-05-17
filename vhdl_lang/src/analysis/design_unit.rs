@@ -75,10 +75,10 @@ impl<'a> AnalyzeContext<'a> {
         );
 
         if let Some(ref mut list) = unit.generic_clause {
-            self.analyze_interface_list(&mut primary_region, list, diagnostics)?;
+            self.analyze_interface_list(&mut primary_region, &mut list.items, diagnostics)?;
         }
         if let Some(ref mut list) = unit.port_clause {
-            self.analyze_interface_list(&mut primary_region, list, diagnostics)?;
+            self.analyze_interface_list(&mut primary_region, &mut list.items, diagnostics)?;
         }
         self.analyze_declarative_part(&mut primary_region, &mut unit.decl, diagnostics)?;
         self.analyze_concurrent_part(&mut primary_region, &mut unit.statements, diagnostics)?;
@@ -148,7 +148,7 @@ impl<'a> AnalyzeContext<'a> {
         );
 
         if let Some(ref mut list) = unit.generic_clause {
-            self.analyze_interface_list(&mut primary_region, list, diagnostics)?;
+            self.analyze_interface_list(&mut primary_region, &mut list.items, diagnostics)?;
         }
         self.analyze_declarative_part(&mut primary_region, &mut unit.decl, diagnostics)?;
 

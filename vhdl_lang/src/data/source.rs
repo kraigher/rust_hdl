@@ -2,11 +2,10 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this file,
 // You can obtain one at http://mozilla.org/MPL/2.0/.
 //
-// Copyright (c) 2018, Olof Kraigher olof.kraigher@gmail.com
+// Copyright (c) 2020, Olof Kraigher olof.kraigher@gmail.com
 
 use super::contents::Contents;
 use super::diagnostic::{Diagnostic, DiagnosticResult};
-use pad;
 use parking_lot::{RwLock, RwLockReadGuard};
 use std::cmp::{max, min};
 use std::collections::hash_map::DefaultHasher;
@@ -399,7 +398,7 @@ impl SrcPos {
         context_lines: u32,
     ) -> (usize, String) {
         let lines = self.get_line_context(context_lines, contents);
-        use self::pad::{Alignment, PadStr};
+        use pad::{Alignment, PadStr};
         // +1 since lines are shown with 1-index
         let lineno_len = (self.range.start.line + context_lines + 1)
             .to_string()

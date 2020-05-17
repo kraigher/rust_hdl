@@ -407,6 +407,13 @@ pub struct Token {
 }
 
 #[derive(PartialEq, Clone, Debug)]
+pub struct KeyWordToken {
+    pub kind: Kind,
+    pub pos: SrcPos,
+    pub comments: Option<Box<TokenComments>>,
+}
+
+#[derive(PartialEq, Clone, Debug)]
 pub struct TokenComments {
     pub leading: Vec<Comment>,
     pub trailing: Option<Comment>,
@@ -430,6 +437,16 @@ use std::convert::Into;
 impl Into<SrcPos> for Token {
     fn into(self) -> SrcPos {
         self.pos
+    }
+}
+
+impl From<Token> for KeyWordToken {
+    fn from(token: Token) -> KeyWordToken {
+        KeyWordToken {
+            kind: token.kind,
+            pos: token.pos,
+            comments: token.comments,
+        }
     }
 }
 

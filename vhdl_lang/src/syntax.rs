@@ -32,4 +32,4 @@ mod waveform;
 pub mod test;
 
 pub use parser::{ParserResult, VHDLParser};
-pub use tokens::Symbols;
+pub use tokens::{KeyWordToken, Symbols};

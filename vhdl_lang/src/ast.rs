@@ -3,7 +3,7 @@
 // This Source Code Form is subject to the terms of the Mozilla Public
 // You can obtain one at http://mozilla.org/MPL/2.0/.
 //
-// Copyright (c) 2018, Olof Kraigher olof.kraigher@gmail.com
+// Copyright (c) 2020, Olof Kraigher olof.kraigher@gmail.com
 
 // Allowing this, since box_patterns are feature gated: https://github.com/rust-lang/rfcs/pull/469
 // Track here: https://github.com/rust-lang/rust/issues/29641
@@ -23,6 +23,8 @@ pub use self::name_util::*;
 pub use any_design_unit::*;
 
 use crate::data::*;
+
+pub use crate::data::KeyWordToken;
 
 /// LRM 15.8 Bit string literals
 #[derive(PartialEq, Copy, Clone, Debug)]
@@ -622,6 +624,15 @@ pub enum InterfaceDeclaration {
     Package(InterfacePackageDeclaration),
 }
 
+#[derive(PartialEq, Debug, Clone)]
+pub struct InterfaceList {
+    pub items: Vec<InterfaceDeclaration>,
+
+    // Tokens
+    pub start_token: KeyWordToken, // port/generiv/parameter
+    pub semi_token: KeyWordToken,
+}
+
 #[derive(PartialEq, Debug, Clone, Copy)]
 pub enum Mode {
     In,
@@ -629,11 +640,6 @@ pub enum Mode {
     InOut,
     Buffer,
     Linkage,
-}
-
-#[derive(PartialEq, Debug, Clone)]
-pub struct PortClause {
-    pub port_list: Vec<InterfaceDeclaration>,
 }
 
 /// LRM 6.8 Component declarations
@@ -859,6 +865,10 @@ pub struct BlockStatement {
     pub header: BlockHeader,
     pub decl: Vec<Declaration>,
     pub statements: Vec<LabeledConcurrentStatement>,
+
+    // Tokens
+    pub block_token: KeyWordToken,
+    pub semi_token: KeyWordToken,
 }
 
 /// LRM 11.2 Block statement
@@ -883,6 +893,10 @@ pub struct ProcessStatement {
     pub sensitivity_list: Option<SensitivityList>,
     pub decl: Vec<Declaration>,
     pub statements: Vec<LabeledSequentialStatement>,
+
+    // Tokens
+    pub start_token: KeyWordToken, // postponed/process
+    pub semi_token: KeyWordToken,
 }
 
 /// LRM 11.4 Concurrent procedure call statements
@@ -997,6 +1011,12 @@ pub enum ContextItem {
 pub struct ContextDeclaration {
     pub ident: Ident,
     pub items: ContextClause,
+
+    // Tokens
+    pub context_token: KeyWordToken,
+    pub is_token: KeyWordToken,
+    pub end_token: KeyWordToken,
+    pub semi_token: KeyWordToken,
 }
 
 /// LRM 4.9 Package instatiation declaration
@@ -1006,6 +1026,10 @@ pub struct PackageInstantiation {
     pub ident: Ident,
     pub package_name: WithPos<SelectedName>,
     pub generic_map: Option<Vec<AssociationElement>>,
+
+    // Tokens
+    pub package_token: KeyWordToken,
+    pub semi_token: KeyWordToken,
 }
 
 /// LRM 7.3 Configuration specification
@@ -1093,6 +1117,12 @@ pub struct ConfigurationDeclaration {
     pub decl: Vec<ConfigurationDeclarativeItem>,
     pub vunit_bind_inds: Vec<VUnitBindingIndication>,
     pub block_config: BlockConfiguration,
+
+    // Tokens
+    pub configuration_token: KeyWordToken,
+    pub is_token: KeyWordToken,
+    pub end_token: KeyWordToken,
+    pub semi_token: KeyWordToken,
 }
 
 /// LRM 3.2 Entity declarations
@@ -1100,10 +1130,17 @@ pub struct ConfigurationDeclaration {
 pub struct EntityDeclaration {
     pub context_clause: ContextClause,
     pub ident: Ident,
-    pub generic_clause: Option<Vec<InterfaceDeclaration>>,
-    pub port_clause: Option<Vec<InterfaceDeclaration>>,
+    pub generic_clause: Option<InterfaceList>,
+    pub port_clause: Option<InterfaceList>,
     pub decl: Vec<Declaration>,
     pub statements: Vec<LabeledConcurrentStatement>,
+
+    // Tokens
+    pub entity_token: KeyWordToken,
+    pub is_token: KeyWordToken,
+    pub begin_token: Option<KeyWordToken>,
+    pub end_token: KeyWordToken,
+    pub semi_token: KeyWordToken,
 }
 /// LRM 3.3 Architecture bodies
 #[derive(PartialEq, Debug, Clone)]
@@ -1113,6 +1150,13 @@ pub struct ArchitectureBody {
     pub entity_name: WithRef<Ident>,
     pub decl: Vec<Declaration>,
     pub statements: Vec<LabeledConcurrentStatement>,
+
+    // Tokens
+    pub architecture_token: KeyWordToken,
+    pub is_token: KeyWordToken,
+    pub begin_token: KeyWordToken,
+    pub end_token: KeyWordToken,
+    pub semi_token: KeyWordToken,
 }
 
 /// LRM 4.7 Package declarations
@@ -1120,8 +1164,14 @@ pub struct ArchitectureBody {
 pub struct PackageDeclaration {
     pub context_clause: ContextClause,
     pub ident: Ident,
-    pub generic_clause: Option<Vec<InterfaceDeclaration>>,
+    pub generic_clause: Option<InterfaceList>,
     pub decl: Vec<Declaration>,
+
+    // Tokens
+    pub package_token: KeyWordToken,
+    pub is_token: KeyWordToken,
+    pub end_token: KeyWordToken,
+    pub semi_token: KeyWordToken,
 }
 
 /// LRM 4.8 Package bodies
@@ -1130,6 +1180,12 @@ pub struct PackageBody {
     pub context_clause: ContextClause,
     pub ident: WithRef<Ident>,
     pub decl: Vec<Declaration>,
+
+    // Tokens
+    pub package_token: KeyWordToken,
+    pub is_token: KeyWordToken,
+    pub end_token: KeyWordToken,
+    pub semi_token: KeyWordToken,
 }
 
 /// LRM 13.1 Design units

@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this file,
 // You can obtain one at http://mozilla.org/MPL/2.0/.
 //
-// Copyright (c) 2018, Olof Kraigher olof.kraigher@gmail.com
+// Copyright (c) 2020, Olof Kraigher olof.kraigher@gmail.com
 
 use super::common::error_on_end_identifier_mismatch;
 use super::common::ParseResult;
@@ -268,11 +268,11 @@ pub fn parse_configuration_declaration(
     stream: &mut TokenStream,
     diagnostics: &mut dyn DiagnosticHandler,
 ) -> ParseResult<ConfigurationDeclaration> {
-    stream.expect_kind(Configuration)?;
+    let configuration_token = stream.expect_kind(Configuration)?.into();
     let ident = stream.expect_ident()?;
     stream.expect_kind(Of)?;
     let entity_name = parse_selected_name(stream)?;
-    stream.expect_kind(Is)?;
+    let is_token = stream.expect_kind(Is)?.into();
     let mut decl = Vec::new();
 
     let vunit_bind_inds = loop {
@@ -295,13 +295,13 @@ pub fn parse_configuration_declaration(
     stream.expect_kind(For)?;
     let block_config = parse_block_configuration_known_keyword(stream, diagnostics)?;
 
-    stream.expect_kind(End)?;
+    let end_token = stream.expect_kind(End)?.into();
     stream.pop_if_kind(Configuration)?;
     let end_ident = stream.pop_optional_ident()?;
     if let Some(diagnostic) = error_on_end_identifier_mismatch(&ident, &end_ident) {
         diagnostics.push(diagnostic)
     }
-    stream.expect_kind(SemiColon)?;
+    let semi_token = stream.expect_kind(SemiColon)?.into();
     Ok(ConfigurationDeclaration {
         context_clause: ContextClause::default(),
         ident,
@@ -309,6 +309,10 @@ pub fn parse_configuration_declaration(
         decl,
         vunit_bind_inds,
         block_config,
+        configuration_token,
+        is_token,
+        end_token,
+        semi_token,
     })
 }
 
@@ -352,6 +356,7 @@ pub fn parse_configuration_specification(
 mod tests {
     use super::*;
     use crate::syntax::test::Code;
+    use pretty_assertions::assert_eq;
 
     #[test]
     fn empty_configuration() {
@@ -375,7 +380,11 @@ end;
                     block_spec: code.s1("rtl(0)").name(),
                     use_clauses: vec![],
                     items: vec![],
-                }
+                },
+                configuration_token: code.keyword_token(Configuration, 1),
+                is_token: code.keyword_token(Is, 1),
+                end_token: code.keyword_token(End, -1),
+                semi_token: code.keyword_token(SemiColon, -1),
             }
         );
     }
@@ -402,7 +411,11 @@ end configuration cfg;
                     block_spec: code.s1("rtl(0)").name(),
                     use_clauses: vec![],
                     items: vec![],
-                }
+                },
+                configuration_token: code.keyword_token(Configuration, 1),
+                is_token: code.keyword_token(Is, 1),
+                end_token: code.keyword_token(End, -1),
+                semi_token: code.keyword_token(SemiColon, -1),
             }
         );
     }
@@ -433,7 +446,11 @@ end configuration cfg;
                     block_spec: code.s1("rtl(0)").name(),
                     use_clauses: vec![],
                     items: vec![],
-                }
+                },
+                configuration_token: code.keyword_token(Configuration, 1),
+                is_token: code.keyword_token(Is, 1),
+                end_token: code.keyword_token(End, -1),
+                semi_token: code.keyword_token(SemiColon, -1),
             }
         );
     }
@@ -466,7 +483,11 @@ end configuration cfg;
                     block_spec: code.s1("rtl(0)").name(),
                     use_clauses: vec![],
                     items: vec![],
-                }
+                },
+                configuration_token: code.keyword_token(Configuration, 1),
+                is_token: code.keyword_token(Is, 1),
+                end_token: code.keyword_token(End, -1),
+                semi_token: code.keyword_token(SemiColon, -1),
             }
         );
     }
@@ -493,7 +514,11 @@ end configuration cfg;
                     block_spec: code.s1("rtl(0)").name(),
                     use_clauses: vec![],
                     items: vec![],
-                }
+                },
+                configuration_token: code.keyword_token(Configuration, 1),
+                is_token: code.keyword_token(Is, 1),
+                end_token: code.keyword_token(End, -1),
+                semi_token: code.keyword_token(SemiColon, -1),
             }
         );
     }
@@ -535,7 +560,11 @@ end configuration cfg;
                             items: vec![],
                         })
                     ],
-                }
+                },
+                configuration_token: code.keyword_token(Configuration, 1),
+                is_token: code.keyword_token(Is, 1),
+                end_token: code.keyword_token(End, -1),
+                semi_token: code.keyword_token(SemiColon, -1),
             }
         );
     }
@@ -580,7 +609,11 @@ end configuration cfg;
                             items: vec![],
                         }),
                     }),],
-                }
+                },
+                configuration_token: code.keyword_token(Configuration, 1),
+                is_token: code.keyword_token(Is, 1),
+                end_token: code.keyword_token(End, -1),
+                semi_token: code.keyword_token(SemiColon, -1),
             }
         );
     }
@@ -636,7 +669,11 @@ end configuration cfg;
                             items: vec![],
                         }),
                     }),],
-                }
+                },
+                configuration_token: code.keyword_token(Configuration, 1),
+                is_token: code.keyword_token(Is, 1),
+                end_token: code.keyword_token(End, -1),
+                semi_token: code.keyword_token(SemiColon, -1),
             }
         );
     }
@@ -683,7 +720,11 @@ end configuration cfg;
                         vunit_bind_inds: Vec::new(),
                         block_config: None,
                     }),],
-                }
+                },
+                configuration_token: code.keyword_token(Configuration, 1),
+                is_token: code.keyword_token(Is, 1),
+                end_token: code.keyword_token(End, -1),
+                semi_token: code.keyword_token(SemiColon, -1),
             }
         );
     }
@@ -761,7 +802,11 @@ end configuration cfg;
                             block_config: None,
                         })
                     ],
-                }
+                },
+                configuration_token: code.keyword_token(Configuration, 1),
+                is_token: code.keyword_token(Is, 1),
+                end_token: code.keyword_token(End, -1),
+                semi_token: code.keyword_token(SemiColon, -1),
             }
         );
     }
