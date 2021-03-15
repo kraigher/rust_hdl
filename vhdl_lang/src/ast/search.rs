@@ -795,8 +795,10 @@ impl Search for QualifiedExpression {
 
 impl Search for AssociationElement {
     fn search(&self, searcher: &mut impl Searcher) -> SearchResult {
-        // @TODO more formal
-        let AssociationElement { actual, .. } = self;
+        let AssociationElement { formal, actual } = self;
+        if let Some(formal) = formal {
+            return_if_found!(formal.search(searcher));
+        }
         match actual.item {
             ActualPart::Expression(ref expr) => {
                 return_if_found!(search_pos_expr(&actual.pos, expr, searcher));

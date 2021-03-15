@@ -370,13 +370,85 @@ impl<'a> AnalyzeContext<'a> {
         Ok(())
     }
 
+    pub fn resolve_formal(
+        &self,
+        region: &Region<'_>,
+        list_region: &Region<'_>,
+        formal_pos: &SrcPos,
+        formal: &mut Name,
+        diagnostics: &mut dyn DiagnosticHandler,
+    ) -> FatalResult<Option<NamedEntities>> {
+        // LRM 6.5.7 Association lists
+        // @TODO Mode in does not allow conversion function nor type conversion
+        match formal {
+            Name::Designator(designator) => {
+                designator.clear_reference();
+                if let Some(visible) = list_region.lookup_immediate(designator.designator()) {
+                    designator.set_reference(visible);
+                    Ok(Some(visible.clone()))
+                } else {
+                    diagnostics.push(Diagnostic::error(
+                        formal_pos,
+                        format!("No declaration of '{}'", designator),
+                    ));
+                    Ok(None)
+                }
+            }
+            Name::Selected(..) => self.resolve_name(list_region, formal_pos, formal, diagnostics),
+            Name::Indexed(ref mut prefix, ref mut exprs) => {
+                self.resolve_name(list_region, &prefix.pos, &mut prefix.item, diagnostics)?;
+                for expr in exprs.iter_mut() {
+                    self.analyze_expression(region, expr, diagnostics)?;
+                }
+                Ok(None)
+            }
+            Name::Slice(ref mut prefix, ref mut drange) => {
+                self.resolve_name(list_region, &prefix.pos, &mut prefix.item, diagnostics)?;
+                self.analyze_discrete_range(region, drange.as_mut(), diagnostics)?;
+                Ok(None)
+            }
+            Name::FunctionCall(ref mut fcall) => {
+                let FunctionCall { name, parameters } = fcall.as_mut();
+                // Disambiguate between indexed name and function call
+                if let Name::Designator(designator) = &mut name.item {
+                    if let Some(visible) = list_region.lookup_immediate(designator.designator()) {
+                        designator.set_reference(visible);
+                        self.analyze_assoc_elems(region, None, parameters, diagnostics)?;
+                        return Ok(Some(visible.clone()));
+                    }
+                }
+
+                // @TODO Verify single formal argument
+                self.resolve_name(region, &name.pos, &mut name.item, diagnostics)?;
+                self.analyze_assoc_elems(list_region, None, parameters, diagnostics)?;
+                Ok(None)
+            }
+            _ => {
+                diagnostics.push(Diagnostic::error(formal_pos, "Invalid formal designator"));
+                Ok(None)
+            }
+        }
+    }
+
     pub fn analyze_assoc_elems(
         &self,
         region: &Region<'_>,
+        list_region: Option<&Region>,
         elems: &mut Vec<AssociationElement>,
         diagnostics: &mut dyn DiagnosticHandler,
     ) -> FatalNullResult {
-        for AssociationElement { actual, .. } in elems.iter_mut() {
+        for AssociationElement { formal, actual } in elems.iter_mut() {
+            if let Some(formal) = formal {
+                if let Some(list_region) = list_region {
+                    self.resolve_formal(
+                        region,
+                        list_region,
+                        &formal.pos,
+                        &mut formal.item,
+                        diagnostics,
+                    )?;
+                }
+            }
             match actual.item {
                 ActualPart::Expression(ref mut expr) => {
                     self.analyze_expression_pos(region, &actual.pos, expr, diagnostics)?;
@@ -395,7 +467,7 @@ impl<'a> AnalyzeContext<'a> {
     ) -> FatalNullResult {
         let FunctionCall { name, parameters } = fcall;
         self.resolve_name(region, &name.pos, &mut name.item, diagnostics)?;
-        self.analyze_assoc_elems(region, parameters, diagnostics)
+        self.analyze_assoc_elems(region, None, parameters, diagnostics)
     }
 
     pub fn analyze_aggregate(

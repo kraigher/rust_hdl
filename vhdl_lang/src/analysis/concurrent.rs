@@ -48,13 +48,13 @@ impl<'a> AnalyzeContext<'a> {
                     self.analyze_interface_list(&mut region, list, diagnostics)?;
                 }
                 if let Some(ref mut list) = block.header.generic_map {
-                    self.analyze_assoc_elems(parent, list, diagnostics)?;
+                    self.analyze_assoc_elems(parent, Some(&region), list, diagnostics)?;
                 }
                 if let Some(ref mut list) = block.header.port_clause {
                     self.analyze_interface_list(&mut region, list, diagnostics)?;
                 }
                 if let Some(ref mut list) = block.header.port_map {
-                    self.analyze_assoc_elems(parent, list, diagnostics)?;
+                    self.analyze_assoc_elems(parent, Some(&region), list, diagnostics)?;
                 }
                 self.analyze_declarative_part(&mut region, &mut block.decl, diagnostics)?;
                 self.analyze_concurrent_part(&mut region, &mut block.statements, diagnostics)?;
@@ -188,48 +188,47 @@ impl<'a> AnalyzeContext<'a> {
         instance: &mut InstantiationStatement,
         diagnostics: &mut dyn DiagnosticHandler,
     ) -> FatalNullResult {
-        match instance.unit {
+        let unit = match instance.unit {
             // @TODO architecture
             InstantiatedUnit::Entity(ref mut entity_name, ..) => {
                 fn is_entity(kind: &NamedEntityKind) -> bool {
                     matches!(kind, NamedEntityKind::Entity(..))
                 }
 
-                if let Err(err) =
-                    self.resolve_non_overloaded(parent, entity_name, &is_entity, "entity")
-                {
-                    err.add_to(diagnostics)?;
-                }
+                self.resolve_non_overloaded(parent, entity_name, &is_entity, "entity")
             }
             InstantiatedUnit::Component(ref mut component_name) => {
                 fn is_component(kind: &NamedEntityKind) -> bool {
                     matches!(kind, NamedEntityKind::Component)
                 }
 
-                if let Err(err) =
-                    self.resolve_non_overloaded(parent, component_name, &is_component, "component")
-                {
-                    err.add_to(diagnostics)?;
-                }
+                self.resolve_non_overloaded(parent, component_name, &is_component, "component")
             }
             InstantiatedUnit::Configuration(ref mut config_name) => {
                 fn is_configuration(kind: &NamedEntityKind) -> bool {
                     matches!(kind, NamedEntityKind::Configuration(..))
                 }
 
-                if let Err(err) = self.resolve_non_overloaded(
-                    parent,
-                    config_name,
-                    &is_configuration,
-                    "configuration",
-                ) {
-                    err.add_to(diagnostics)?;
-                }
+                self.resolve_non_overloaded(parent, config_name, &is_configuration, "configuration")
             }
         };
 
-        self.analyze_assoc_elems(parent, &mut instance.generic_map, diagnostics)?;
-        self.analyze_assoc_elems(parent, &mut instance.port_map, diagnostics)?;
+        let list_region = match unit {
+            Ok(ref unit) => match unit.kind() {
+                NamedEntityKind::Entity(list_region) => Some(list_region.as_ref()),
+                // @TODO add interface list region to component
+                NamedEntityKind::Component => None,
+                NamedEntityKind::Configuration(list_region) => Some(list_region.as_ref()),
+                _ => None,
+            },
+            Err(err) => {
+                err.add_to(diagnostics)?;
+                None
+            }
+        };
+
+        self.analyze_assoc_elems(parent, list_region, &mut instance.generic_map, diagnostics)?;
+        self.analyze_assoc_elems(parent, list_region, &mut instance.port_map, diagnostics)?;
 
         Ok(())
     }
